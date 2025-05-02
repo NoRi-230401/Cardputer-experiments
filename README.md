@@ -1,3 +1,18 @@
+
+[forked from polyphasicdevs/Cardputer-experiments](https://github.com/polyphasicdevs/Cardputer-experiments)
+
+
+
+## modifed by me
+ * change to vsCode + platformio enviroment
+ * SD_updater for cardputer
+ * some bugs fixed
+
+thank `polyphasicdevs` ! 
+
+**Original document** 
+-----
+
 # Cardputer Games Collection
 
 Welcome to the Cardputer Games Collection! This repository is a showcase of classic games adapted for the Cardputer, a versatile development platform based on the ESP32. From the inception of the idea to the final execution, this project has been a journey of exploration, learning, and collaboration with AI technology. Dive into the world of game development on the Cardputer and see what's possible with a bit of creativity and guidance from AI.

@@ -1,9 +1,5 @@
 #include "M5Cardputer.h"
 // ------------------------------------------
-#include <Arduino.h>
-#include <M5StackUpdater.h>
-SPIClass SPI2;
-
 bool areAllBricksCleared();
 void displayLevelCleared();
 void moveBall();
@@ -18,7 +14,8 @@ void drawPaddle();
 void drawBall();
 void drawBricks();
 void redrawBrick(int row, int col);
-void drawScore();   
+void drawScore();
+void drawLives();
 // ------------------------------------------
 
 #define TFT_BLACK 0x0000
@@ -36,7 +33,8 @@ const uint16_t BRICK_COLOR[BRICK_COLORS] = {0xF800, 0xFFE0, 0x07FF, 0x07E0, 0x00
 #define BRICK_WIDTH (SCREEN_WIDTH / BRICK_COLUMNS)
 #define BRICK_HEIGHT 8
 #define SCORE_X 10
-#define SCORE_Y 10
+// #define SCORE_Y 10
+#define SCORE_Y 50
 
 int paddleX = SCREEN_WIDTH / 2 - PADDLE_WIDTH / 2;
 int ballX = paddleX + PADDLE_WIDTH / 2 - BALL_SIZE / 2;
@@ -57,30 +55,11 @@ int lastBallY;
 
 void setup()
 {
-    // ------------------------------------------
-    auto cfg = M5.config();
-    cfg.serial_baudrate = 115200;
-
-    M5Cardputer.begin(cfg, true);
-    SPI2.begin(
-        M5.getPin(m5::pin_name_t::sd_spi_sclk),
-        M5.getPin(m5::pin_name_t::sd_spi_miso),
-        M5.getPin(m5::pin_name_t::sd_spi_mosi),
-        M5.getPin(m5::pin_name_t::sd_spi_ss));
-    while (false == SD.begin(M5.getPin(m5::pin_name_t::sd_spi_ss), SPI2))
-    {
-        delay(500);
-    }
-    M5Cardputer.update();
-
-    if (M5Cardputer.Keyboard.isKeyPressed('a'))
-    {
-        updateFromFS(SD, "/menu.bin");
-        ESP.restart();
-    }
-    // ------------------------------------------
-
+    // --------------------------------------
+    SDU_lobby_cardputer();
     // M5Cardputer.begin();
+    // --------------------------------------
+
     M5Cardputer.Display.setBrightness(70);
     M5Cardputer.Display.setRotation(1);
     M5Cardputer.Display.fillScreen(TFT_BLACK);
@@ -98,9 +77,10 @@ void loop()
 {
     M5Cardputer.update();
 
-    if (lives <= 0 || levelCleared)
+    if (M5Cardputer.Keyboard.isKeyPressed('r'))
     {
-        return; // Skip the rest of the loop if the game is over or level is cleared
+        restartGame();
+        return; // Exit the loop to start a new game
     }
 
     if (M5Cardputer.Keyboard.isKeyPressed('m'))
@@ -108,10 +88,9 @@ void loop()
         soundEnabled = !soundEnabled;
     }
 
-    if (M5Cardputer.Keyboard.isKeyPressed('r'))
+    if (lives <= 0 || levelCleared)
     {
-        restartGame();
-        return; // Exit the loop to start a new game
+        return; // Skip the rest of the loop if the game is over or level is cleared
     }
 
     if (M5Cardputer.Keyboard.isKeyPressed('a'))
@@ -119,6 +98,7 @@ void loop()
         paddleX -= paddleSpeed;
         paddleX = max(paddleX, 0);
     }
+
     if (M5Cardputer.Keyboard.isKeyPressed('l'))
     {
         paddleX += paddleSpeed;
@@ -161,6 +141,7 @@ void displayLevelCleared()
     M5Cardputer.Display.fillScreen(TFT_BLACK);
     M5Cardputer.Display.setCursor((SCREEN_WIDTH - M5Cardputer.Display.textWidth("LEVEL CLEARED!")) / 2, SCREEN_HEIGHT / 2);
     M5Cardputer.Display.println("LEVEL CLEARED!");
+    // delay(2000);
     delay(2000);
     M5Cardputer.Display.fillScreen(TFT_BLACK);
 }
@@ -193,10 +174,12 @@ void moveBall()
         lives--;
         if (lives <= 0)
         {
+            drawLives();
             gameOver();
         }
         else
         {
+            drawLives();
             resetBallAndPaddle();
         }
     }
@@ -233,7 +216,9 @@ void gameOver()
     M5Cardputer.Display.fillScreen(TFT_BLACK);
     M5Cardputer.Display.setCursor((SCREEN_WIDTH - M5Cardputer.Display.textWidth("GAME OVER")) / 2, SCREEN_HEIGHT / 2);
     M5Cardputer.Display.println("GAME OVER");
+    // delay(3000);
     delay(3000);
+    
     lives = 0; // Prevent re-entering this section
     M5Cardputer.Display.fillScreen(TFT_BLACK);
     initializeBricks();
@@ -249,6 +234,7 @@ void restartGame()
     initializeBricks();
     resetBallAndPaddle();
     drawScore();
+    drawLives();
 }
 
 void initializeBricks()
@@ -326,4 +312,12 @@ void drawScore()
     M5Cardputer.Display.setCursor(SCORE_X, SCORE_Y);
     M5Cardputer.Display.print("Score: ");
     M5Cardputer.Display.print(score);
+}
+
+void drawLives()
+{
+    M5Cardputer.Display.fillRect(SCORE_X + 170, SCORE_Y - 10, 50, 20, TFT_BLACK);
+    M5Cardputer.Display.setCursor(SCORE_X + 170, SCORE_Y);
+    M5Cardputer.Display.print("Lives: ");
+    M5Cardputer.Display.print(lives);
 }

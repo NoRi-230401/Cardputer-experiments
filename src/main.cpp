@@ -1,9 +1,10 @@
 // ---------------------------------------------------------
 // * main.cpp *      by NoRi 2025-01-23
 // ----------------------------------------------------------
+#include "SDUpdater.h"
 
 // ************ <<< Uncomment just one line >>> **********
-// #include "../examples/BrickBreakerClone.cpp"
-#include "../examples/PongClone.cpp"
-// #include "../examples/SpaceInvadersClone.cpp"
+#include "../GAMES/BrickBreakerClone.cpp"
+// #include "../GAMES/PongClone.cpp"
+// #include "../GAMES/SpaceInvadersClone.cpp"
 // *******************************************************

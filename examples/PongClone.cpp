@@ -1,4 +1,21 @@
 #include "M5Cardputer.h"
+// ------------------------------------------
+#include <Arduino.h>
+#include <M5StackUpdater.h>
+SPIClass SPI2;
+
+void showSplashScreen();
+void drawScores();
+void drawPaddlesAndBall();
+void handleControls();
+void updateBall();
+void checkCollisions();
+void updateDisplay();
+void checkScoring();
+void resetBall(); 
+void endGame(int winner);
+void resetMatch();    
+// ------------------------------------------
 
 #define TFT_GREEN 0x07E0
 #define TFT_BLACK 0x0000
@@ -21,8 +38,32 @@ int score1 = 0;
 int score2 = 0;
 bool gameActive = true;
 
-void setup() {
-  M5Cardputer.begin();
+void setup()
+{
+  // ------------------------------------------
+  auto cfg = M5.config();
+  cfg.serial_baudrate = 115200;
+
+  M5Cardputer.begin(cfg, true);
+  SPI2.begin(
+      M5.getPin(m5::pin_name_t::sd_spi_sclk),
+      M5.getPin(m5::pin_name_t::sd_spi_miso),
+      M5.getPin(m5::pin_name_t::sd_spi_mosi),
+      M5.getPin(m5::pin_name_t::sd_spi_ss));
+  while (false == SD.begin(M5.getPin(m5::pin_name_t::sd_spi_ss), SPI2))
+  {
+    delay(500);
+  }
+  M5Cardputer.update();
+
+  if (M5Cardputer.Keyboard.isKeyPressed('a'))
+  {
+    updateFromFS(SD, "/menu.bin");
+    ESP.restart();
+  }
+  // ------------------------------------------
+
+  // M5Cardputer.begin();
   M5Cardputer.Display.setBrightness(70);
   M5Cardputer.Display.setRotation(1);
   M5Cardputer.Display.fillScreen(TFT_BLACK);
@@ -31,12 +72,14 @@ void setup() {
 
   // Splash screen
   showSplashScreen();
-  drawScores(); // Draw initial scores
+  drawScores();         // Draw initial scores
   drawPaddlesAndBall(); // Draw initial positions of paddles and ball
 }
 
-void loop() {
-  if (gameActive) {
+void loop()
+{
+  if (gameActive)
+  {
     M5Cardputer.update();
 
     // Check for control inputs
@@ -53,17 +96,22 @@ void loop() {
 
     // Check for scoring
     checkScoring();
-  } else {
+  }
+  else
+  {
     // Check if escape key is pressed to reset the match
-    if (M5Cardputer.Keyboard.isKeyPressed('`')) {
+    if (M5Cardputer.Keyboard.isKeyPressed('`'))
+    {
       resetMatch();
     }
   }
 }
 
-void showSplashScreen() {
+void showSplashScreen()
+{
   String splashText[] = {"Polyphasic", "Developers", "Ltd.", "Pong", "polyphasicdevs.com"};
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 4; i++)
+  {
     int textWidth = M5Cardputer.Display.textWidth(splashText[i]);
     int x = (SCREEN_WIDTH - textWidth) / 2;
     int y = 40 + i * 20; // Adjust y position for each line
@@ -74,63 +122,82 @@ void showSplashScreen() {
   M5Cardputer.Display.fillScreen(TFT_BLACK);
 }
 
-void drawScores() {
+void drawScores()
+{
   M5Cardputer.Display.setCursor(SCREEN_WIDTH / 2 - 20, 10);
   M5Cardputer.Display.print(score1);
   M5Cardputer.Display.print(" | ");
   M5Cardputer.Display.print(score2);
 }
 
-void drawPaddlesAndBall() {
+void drawPaddlesAndBall()
+{
   M5Cardputer.Display.fillRect(0, paddle1Y, PADDLE_WIDTH, PADDLE_HEIGHT, TFT_GREEN);
   M5Cardputer.Display.fillRect(SCREEN_WIDTH - PADDLE_WIDTH, paddle2Y, PADDLE_WIDTH, PADDLE_HEIGHT, TFT_GREEN);
   M5Cardputer.Display.fillRect(ballX, ballY, BALL_SIZE, BALL_SIZE, TFT_GREEN);
 }
 
-void handleControls() {
-  if (M5Cardputer.Keyboard.isKeyPressed('1')) paddle1Y -= paddleSpeed;
-  if (M5Cardputer.Keyboard.isKeyPressed('q')) paddle1Y += paddleSpeed;
-  if (M5Cardputer.Keyboard.isKeyPressed('0')) paddle2Y -= paddleSpeed;
-  if (M5Cardputer.Keyboard.isKeyPressed('p')) paddle2Y += paddleSpeed;
-  
+void handleControls()
+{
+  if (M5Cardputer.Keyboard.isKeyPressed('1'))
+    paddle1Y -= paddleSpeed;
+  if (M5Cardputer.Keyboard.isKeyPressed('q'))
+    paddle1Y += paddleSpeed;
+  if (M5Cardputer.Keyboard.isKeyPressed('0'))
+    paddle2Y -= paddleSpeed;
+  if (M5Cardputer.Keyboard.isKeyPressed('p'))
+    paddle2Y += paddleSpeed;
+
   paddle1Y = constrain(paddle1Y, 0, SCREEN_HEIGHT - PADDLE_HEIGHT);
   paddle2Y = constrain(paddle2Y, 0, SCREEN_HEIGHT - PADDLE_HEIGHT);
 }
 
-void updateBall() {
+void updateBall()
+{
   ballX += ballSpeedX;
   ballY += ballSpeedY;
 }
 
-void checkCollisions() {
-  if (ballY <= 0 || ballY >= SCREEN_HEIGHT - BALL_SIZE) ballSpeedY *= -1;
+void checkCollisions()
+{
+  if (ballY <= 0 || ballY >= SCREEN_HEIGHT - BALL_SIZE)
+    ballSpeedY *= -1;
   if ((ballX <= PADDLE_WIDTH && ballY >= paddle1Y && ballY <= paddle1Y + PADDLE_HEIGHT) ||
-      (ballX >= SCREEN_WIDTH - PADDLE_WIDTH - BALL_SIZE && ballY >= paddle2Y && ballY <= paddle2Y + PADDLE_HEIGHT)) {
+      (ballX >= SCREEN_WIDTH - PADDLE_WIDTH - BALL_SIZE && ballY >= paddle2Y && ballY <= paddle2Y + PADDLE_HEIGHT))
+  {
     ballSpeedX *= -1;
     // Play the paddle hit sound
     M5Cardputer.Speaker.tone(1000, 10);
   }
 }
 
-void updateDisplay() {
+void updateDisplay()
+{
   M5Cardputer.Display.fillScreen(TFT_BLACK);
   drawScores();
   drawPaddlesAndBall();
 }
 
-void checkScoring() {
-  if (ballX <= 0) {
+void checkScoring()
+{
+  if (ballX <= 0)
+  {
     score2++;
     resetBall();
-    if (score2 >= SCORE_LIMIT) endGame(2);
-  } else if (ballX >= SCREEN_WIDTH - BALL_SIZE) {
+    if (score2 >= SCORE_LIMIT)
+      endGame(2);
+  }
+  else if (ballX >= SCREEN_WIDTH - BALL_SIZE)
+  {
     score1++;
     resetBall();
-    if (score1 >= SCORE_LIMIT) endGame(1);
+    if (score1 >= SCORE_LIMIT)
+      endGame(1);
   }
 }
 
-void resetBall() {
+void resetBall()
+{
   ballX = SCREEN_WIDTH / 2 - BALL_SIZE / 2;
   ballY = SCREEN_HEIGHT / 2 - BALL_SIZE / 2;
   ballSpeedX = -ballSpeedX; // Change direction
@@ -139,7 +206,8 @@ void resetBall() {
   M5Cardputer.Speaker.tone(500, 500);
 }
 
-void endGame(int winner) {
+void endGame(int winner)
+{
   gameActive = false;
   M5Cardputer.Display.fillScreen(TFT_BLACK);
   M5Cardputer.Display.setCursor((SCREEN_WIDTH - M5Cardputer.Display.textWidth("PLAYER  WINS!")) / 2, SCREEN_HEIGHT / 2);
@@ -150,7 +218,8 @@ void endGame(int winner) {
   M5Cardputer.Speaker.tone(2000, 1000);
 }
 
-void resetMatch() {
+void resetMatch()
+{
   score1 = 0;
   score2 = 0;
   gameActive = true;

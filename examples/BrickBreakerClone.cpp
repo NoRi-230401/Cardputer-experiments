@@ -1,4 +1,25 @@
 #include "M5Cardputer.h"
+// ------------------------------------------
+#include <Arduino.h>
+#include <M5StackUpdater.h>
+SPIClass SPI2;
+
+bool areAllBricksCleared();
+void displayLevelCleared();
+void moveBall();
+void checkBrickCollision();
+void playSound(int frequency, int duration);
+void gameOver();
+void restartGame();
+void initializeBricks();
+void resetBallAndPaddle();
+void redrawElements();
+void drawPaddle();
+void drawBall();
+void drawBricks();
+void redrawBrick(int row, int col);
+void drawScore();   
+// ------------------------------------------
 
 #define TFT_BLACK 0x0000
 #define PADDLE_COLOR 0xFFFF // White
@@ -34,8 +55,32 @@ int lastPaddleX;
 int lastBallX;
 int lastBallY;
 
-void setup() {
-    M5Cardputer.begin();
+void setup()
+{
+    // ------------------------------------------
+    auto cfg = M5.config();
+    cfg.serial_baudrate = 115200;
+
+    M5Cardputer.begin(cfg, true);
+    SPI2.begin(
+        M5.getPin(m5::pin_name_t::sd_spi_sclk),
+        M5.getPin(m5::pin_name_t::sd_spi_miso),
+        M5.getPin(m5::pin_name_t::sd_spi_mosi),
+        M5.getPin(m5::pin_name_t::sd_spi_ss));
+    while (false == SD.begin(M5.getPin(m5::pin_name_t::sd_spi_ss), SPI2))
+    {
+        delay(500);
+    }
+    M5Cardputer.update();
+
+    if (M5Cardputer.Keyboard.isKeyPressed('a'))
+    {
+        updateFromFS(SD, "/menu.bin");
+        ESP.restart();
+    }
+    // ------------------------------------------
+
+    // M5Cardputer.begin();
     M5Cardputer.Display.setBrightness(70);
     M5Cardputer.Display.setRotation(1);
     M5Cardputer.Display.fillScreen(TFT_BLACK);
@@ -49,27 +94,33 @@ void setup() {
     lastBallY = ballY;
 }
 
-void loop() {
+void loop()
+{
     M5Cardputer.update();
 
-    if (lives <= 0 || levelCleared) {
+    if (lives <= 0 || levelCleared)
+    {
         return; // Skip the rest of the loop if the game is over or level is cleared
     }
 
-    if (M5Cardputer.Keyboard.isKeyPressed('m')) {
+    if (M5Cardputer.Keyboard.isKeyPressed('m'))
+    {
         soundEnabled = !soundEnabled;
     }
 
-    if (M5Cardputer.Keyboard.isKeyPressed('r')) {
+    if (M5Cardputer.Keyboard.isKeyPressed('r'))
+    {
         restartGame();
         return; // Exit the loop to start a new game
     }
 
-    if (M5Cardputer.Keyboard.isKeyPressed('a')) {
+    if (M5Cardputer.Keyboard.isKeyPressed('a'))
+    {
         paddleX -= paddleSpeed;
         paddleX = max(paddleX, 0);
     }
-    if (M5Cardputer.Keyboard.isKeyPressed('l')) {
+    if (M5Cardputer.Keyboard.isKeyPressed('l'))
+    {
         paddleX += paddleSpeed;
         paddleX = min(paddleX, SCREEN_WIDTH - PADDLE_WIDTH);
     }
@@ -77,10 +128,11 @@ void loop() {
     moveBall();
     redrawElements();
 
-    if (areAllBricksCleared() && !levelCleared) {
+    if (areAllBricksCleared() && !levelCleared)
+    {
         displayLevelCleared();
         levelCleared = true;
-        delay(2000); // Wait for 2 seconds before starting next level
+        delay(2000);        // Wait for 2 seconds before starting next level
         initializeBricks(); // Initialize the next level
         resetBallAndPaddle();
         levelCleared = false; // Reset the flag for the next level
@@ -89,10 +141,14 @@ void loop() {
     delay(10); // Control the game speed
 }
 
-bool areAllBricksCleared() {
-    for (int i = 0; i < BRICK_ROWS; i++) {
-        for (int j = 0; j < BRICK_COLUMNS; j++) {
-            if (bricks[i][j]) {
+bool areAllBricksCleared()
+{
+    for (int i = 0; i < BRICK_ROWS; i++)
+    {
+        for (int j = 0; j < BRICK_COLUMNS; j++)
+        {
+            if (bricks[i][j])
+            {
                 return false;
             }
         }
@@ -100,7 +156,8 @@ bool areAllBricksCleared() {
     return true;
 }
 
-void displayLevelCleared() {
+void displayLevelCleared()
+{
     M5Cardputer.Display.fillScreen(TFT_BLACK);
     M5Cardputer.Display.setCursor((SCREEN_WIDTH - M5Cardputer.Display.textWidth("LEVEL CLEARED!")) / 2, SCREEN_HEIGHT / 2);
     M5Cardputer.Display.println("LEVEL CLEARED!");
@@ -108,18 +165,22 @@ void displayLevelCleared() {
     M5Cardputer.Display.fillScreen(TFT_BLACK);
 }
 
-void moveBall() {
+void moveBall()
+{
     ballX += ballSpeedX;
     ballY += ballSpeedY;
 
-    if (ballX <= 0 || ballX >= SCREEN_WIDTH - BALL_SIZE) {
+    if (ballX <= 0 || ballX >= SCREEN_WIDTH - BALL_SIZE)
+    {
         ballSpeedX *= -1;
     }
-    if (ballY <= 0) {
+    if (ballY <= 0)
+    {
         ballSpeedY *= -1;
     }
 
-    if (ballX >= paddleX && ballX <= paddleX + PADDLE_WIDTH && ballY >= SCREEN_HEIGHT - PADDLE_HEIGHT - BALL_SIZE) {
+    if (ballX >= paddleX && ballX <= paddleX + PADDLE_WIDTH && ballY >= SCREEN_HEIGHT - PADDLE_HEIGHT - BALL_SIZE)
+    {
         ballSpeedY *= -1;
         ballY = SCREEN_HEIGHT - PADDLE_HEIGHT - BALL_SIZE - 1;
         playSound(1000, 10);
@@ -127,21 +188,28 @@ void moveBall() {
 
     checkBrickCollision();
 
-    if (ballY > SCREEN_HEIGHT) {
+    if (ballY > SCREEN_HEIGHT)
+    {
         lives--;
-        if (lives <= 0) {
+        if (lives <= 0)
+        {
             gameOver();
-        } else {
+        }
+        else
+        {
             resetBallAndPaddle();
         }
     }
 }
 
-void checkBrickCollision() {
+void checkBrickCollision()
+{
     int brickRow = ballY / BRICK_HEIGHT;
     int brickColumn = ballX / BRICK_WIDTH;
-    if (brickRow >= 0 && brickRow < BRICK_ROWS && brickColumn >= 0 && brickColumn < BRICK_COLUMNS) {
-        if (bricks[brickRow][brickColumn]) {
+    if (brickRow >= 0 && brickRow < BRICK_ROWS && brickColumn >= 0 && brickColumn < BRICK_COLUMNS)
+    {
+        if (bricks[brickRow][brickColumn])
+        {
             bricks[brickRow][brickColumn] = false;
             ballSpeedY *= -1;
             score += 10;
@@ -152,27 +220,29 @@ void checkBrickCollision() {
     }
 }
 
-void playSound(int frequency, int duration) {
-    if (soundEnabled) {
+void playSound(int frequency, int duration)
+{
+    if (soundEnabled)
+    {
         M5Cardputer.Speaker.tone(frequency, duration);
     }
 }
 
-void gameOver() {
+void gameOver()
+{
     M5Cardputer.Display.fillScreen(TFT_BLACK);
     M5Cardputer.Display.setCursor((SCREEN_WIDTH - M5Cardputer.Display.textWidth("GAME OVER")) / 2, SCREEN_HEIGHT / 2);
     M5Cardputer.Display.println("GAME OVER");
     delay(3000);
     lives = 0; // Prevent re-entering this section
-M5Cardputer.Display.fillScreen(TFT_BLACK);
+    M5Cardputer.Display.fillScreen(TFT_BLACK);
     initializeBricks();
     resetBallAndPaddle();
     drawScore();
-
-
 }
 
-void restartGame() {
+void restartGame()
+{
     score = 0;
     lives = 3;
     M5Cardputer.Display.fillScreen(TFT_BLACK);
@@ -181,16 +251,20 @@ void restartGame() {
     drawScore();
 }
 
-void initializeBricks() {
-    for (int i = 0; i < BRICK_ROWS; i++) {
-        for (int j = 0; j < BRICK_COLUMNS; j++) {
+void initializeBricks()
+{
+    for (int i = 0; i < BRICK_ROWS; i++)
+    {
+        for (int j = 0; j < BRICK_COLUMNS; j++)
+        {
             bricks[i][j] = random(0, 2); // Randomize brick presence for new level
         }
     }
     drawBricks();
 }
 
-void resetBallAndPaddle() {
+void resetBallAndPaddle()
+{
     paddleX = SCREEN_WIDTH / 2 - PADDLE_WIDTH / 2;
     ballX = paddleX + PADDLE_WIDTH / 2 - BALL_SIZE / 2;
     ballY = SCREEN_HEIGHT - PADDLE_HEIGHT - BALL_SIZE - 10;
@@ -199,14 +273,17 @@ void resetBallAndPaddle() {
     drawBall();
 }
 
-void redrawElements() {
-    if (paddleX != lastPaddleX) {
+void redrawElements()
+{
+    if (paddleX != lastPaddleX)
+    {
         M5Cardputer.Display.fillRect(lastPaddleX, SCREEN_HEIGHT - PADDLE_HEIGHT, PADDLE_WIDTH, PADDLE_HEIGHT, TFT_BLACK);
         drawPaddle();
         lastPaddleX = paddleX;
     }
 
-    if (ballX != lastBallX || ballY != lastBallY) {
+    if (ballX != lastBallX || ballY != lastBallY)
+    {
         M5Cardputer.Display.fillRect(lastBallX, lastBallY, BALL_SIZE, BALL_SIZE, TFT_BLACK);
         drawBall();
         lastBallX = ballX;
@@ -214,29 +291,37 @@ void redrawElements() {
     }
 }
 
-void drawPaddle() {
+void drawPaddle()
+{
     M5Cardputer.Display.fillRect(paddleX, SCREEN_HEIGHT - PADDLE_HEIGHT, PADDLE_WIDTH, PADDLE_HEIGHT, PADDLE_COLOR);
 }
 
-void drawBall() {
+void drawBall()
+{
     M5Cardputer.Display.fillRect(ballX, ballY, BALL_SIZE, BALL_SIZE, BALL_COLOR);
 }
 
-void drawBricks() {
-    for (int i = 0; i < BRICK_ROWS; i++) {
-        for (int j = 0; j < BRICK_COLUMNS; j++) {
-            if (bricks[i][j]) {
+void drawBricks()
+{
+    for (int i = 0; i < BRICK_ROWS; i++)
+    {
+        for (int j = 0; j < BRICK_COLUMNS; j++)
+        {
+            if (bricks[i][j])
+            {
                 M5Cardputer.Display.fillRect(j * BRICK_WIDTH, i * BRICK_HEIGHT, BRICK_WIDTH - 1, BRICK_HEIGHT - 1, BRICK_COLOR[i % BRICK_COLORS]);
             }
         }
     }
 }
 
-void redrawBrick(int row, int col) {
+void redrawBrick(int row, int col)
+{
     M5Cardputer.Display.fillRect(col * BRICK_WIDTH, row * BRICK_HEIGHT, BRICK_WIDTH - 1, BRICK_HEIGHT - 1, TFT_BLACK);
 }
 
-void drawScore() {
+void drawScore()
+{
     M5Cardputer.Display.fillRect(SCORE_X - 10, SCORE_Y - 10, 50, 20, TFT_BLACK);
     M5Cardputer.Display.setCursor(SCORE_X, SCORE_Y);
     M5Cardputer.Display.print("Score: ");
